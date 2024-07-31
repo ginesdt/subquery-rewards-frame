@@ -1,3 +1,5 @@
+'use client';
+
 import { FrameRequest, getFrameHtmlResponse } from '@coinbase/onchainkit/frame';
 import { NextRequest, NextResponse } from 'next/server';
 import { validateFramesMessage } from "@airstack/frames";
