@@ -1,69 +1,54 @@
-import puppeteer from "puppeteer";
 import BigNumber from "bignumber.js";
 import {SUBQUERY_ENDPOINT} from "@/app/const";
+import ChartJsImage from "chartjs-to-image";
 
 async function generateChartImage(rewardsByDate: Record<string, number>) {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
 
   const vertical: boolean = Object.keys(rewardsByDate).length > 20;
 
-  const content = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-    </head>
-    <body>
-      <canvas id="myChart" width="400" height="400"></canvas>
-      <script>
-        const ctx = document.getElementById('myChart').getContext('2d');
-        Chart.register(ChartDataLabels);
-        new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: [${Object.keys(rewardsByDate).map(i => `"${i}"`)}],
-            datasets: [{
-              label: 'Rewards (SQT)',
-              data: [${Object.values(rewardsByDate)}],
-              backgroundColor: 'rgba(75, 192, 192, 1)',
-              borderColor: 'rgba(75, 192, 192, 0.2)',
-              borderWidth: 1
-            }]
+  const myChart = new ChartJsImage();
+  myChart.setConfig({
+    type: 'bar',
+    data: { labels: Object.keys(rewardsByDate), datasets: [
+      { label: 'Rewards (SQT)',
+        data: Object.values(rewardsByDate),
+        backgroundColor: 'rgba(75, 192, 192, 1)',
+        borderColor: 'rgba(75, 192, 192, 0.2)',
+        borderWidth: 1
+      }] },
+    options: {
+      scales: {
+        yAxes: [{
+          ticks: {
+            fontSize: 10,
+            beginAtZero: true,
           },
-          options: {
-            scales: {
-              y: {
-                offset: true
-              }
-            },
-            plugins: {
-              datalabels: {
-                anchor: 'end',
-                align: 'end',
-                ${vertical?'rotation: -70,': "font: {weight: 'bold'},"}
-                color: 'blue',
-                formatter: function (value, context) {
-                    return value;
-                }
-              }
-            }
+        }],
+        xAxes: [{
+          ticks: {
+            fontSize: 10
           }
-        });
-      </script>
-    </body>
-    </html>
-  `
+        }],
+        y: {
+          offset: true,
+        }
+      },
+      plugins: {
+        datalabels: {
+          anchor: 'end',
+          align: 'end',
+          rotation: vertical? -70 : 0,
+          color: 'blue',
+          font: {
+            size: vertical? 9 : 11,
+            weight: vertical?'normal': 'bold',
+          }
+        }
+      },
+    }
+  }).setWidth(500).setHeight(500);
 
-  await page.setContent(content, {waitUntil: 'networkidle0'});
-
-  const chartCanvas = await page.$('#myChart');
-  const chartImage = await chartCanvas?.screenshot({ type: 'png' });
-
-  await browser.close();
-
-  return chartImage;
+  return await myChart.toDataUrl()
 }
 
 function buildQuery(indexer: string|undefined|null, minDate: string, byHour: boolean) {
@@ -152,8 +137,7 @@ async function buildImage(days: number, indexer?: string|null) {
       sortedResults[key] = Math.round(amount.toNumber());
     });
 
-  const chartImage = await generateChartImage(sortedResults);
-  const imageData = `data:image/png;base64,${chartImage?.toString('base64')}`
+  const imageData = await generateChartImage(sortedResults);
   return imageData;
 }
 
